@@ -1,4 +1,4 @@
-#!../sapi/cli/php
+#!sapi/cli/php
 <?php
 
 require_once('inc.tests.php');

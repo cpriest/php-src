@@ -1671,6 +1671,15 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *var_name, 
 	zend_accessor_info **aipp, *ai;
 	zend_function *func = NULL;
 
+	/** ISSUE-ISSET-LANGUAGE-PARSER
+	 *
+	 * 		At this point, Z_STRVAL(function_token->u.constant) == "\n\t\tisset..."
+	 *
+	 * 		*normally* I would expect this to simply be isset but the parser is parsing the whole rest of the script into this one token
+	 *
+	 * 		This does appear to be going through the correct area of zend_language_parser.y (line 702)... no idea what the problem is from here..
+	 */
+
 	/* Locate or create accessor_info structure */
 	if(zend_hash_quick_find(&CG(active_class_entry)->accessors, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, hash_value, (void**) &aipp) == SUCCESS) {
 		ai = *aipp;
