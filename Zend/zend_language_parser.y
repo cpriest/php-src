@@ -181,8 +181,6 @@ static YYSIZE_T zend_yytnamerr(char*, const char*);
 %token T_HALT_COMPILER "__halt_compiler (T_HALT_COMPILER)"
 %token T_CLASS      "class (T_CLASS)"
 %token T_TRAIT      "trait (T_TRAIT)"
-%token T_READONLY      "read-only (T_READONLY)"
-%token T_WRITEONLY      "write-only (T_WRITEONLY)"
 %token T_INTERFACE  "interface (T_INTERFACE)"
 %token T_EXTENDS    "extends (T_EXTENDS)"
 %token T_IMPLEMENTS "implements (T_IMPLEMENTS)"
