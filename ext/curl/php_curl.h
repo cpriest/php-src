@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 5                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2012 The PHP Group                                |
+   | Copyright (c) 1997-2013 The PHP Group                                |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -135,7 +135,9 @@ typedef struct {
 	php_curl_write *write;
 	php_curl_write *write_header;
 	php_curl_read  *read;
+#if CURLOPT_PASSWDFUNCTION != 0
 	zval           *passwd;
+#endif
 	zval           *std_err;
 	php_curl_progress *progress;
 #if LIBCURL_VERSION_NUM >= 0x071500 /* Available since 7.21.0 */
@@ -167,7 +169,6 @@ typedef struct {
 	CURL                    *cp;
 	php_curl_handlers       *handlers;
 	long                     id;
-	unsigned int             uses;
 	zend_bool                in_callback;
 	zval                     *clone;
 } php_curl;

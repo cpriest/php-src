@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | Zend Engine                                                          |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1998-2012 Zend Technologies Ltd. (http://www.zend.com) |
+   | Copyright (c) 1998-2013 Zend Technologies Ltd. (http://www.zend.com) |
    +----------------------------------------------------------------------+
    | This source file is subject to version 2.00 of the Zend license,     |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -257,6 +257,8 @@ ZEND_API char *zend_zval_type_name(const zval *arg);
 
 ZEND_API int zend_parse_method_parameters(int num_args TSRMLS_DC, zval *this_ptr, const char *type_spec, ...);
 ZEND_API int zend_parse_method_parameters_ex(int flags, int num_args TSRMLS_DC, zval *this_ptr, const char *type_spec, ...);
+
+ZEND_API int zend_parse_parameter(int flags, int arg_num TSRMLS_DC, zval **arg, const char *spec, ...);
 
 /* End of parameter parsing API -- andrei */
 

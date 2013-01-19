@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 5                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2012 The PHP Group                                |
+   | Copyright (c) 1997-2013 The PHP Group                                |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -1952,8 +1952,6 @@ PHP_FUNCTION(curl_init)
 	ch->handlers->read->method  = PHP_CURL_DIRECT;
 	ch->handlers->write_header->method = PHP_CURL_IGNORE;
 
-	ch->uses = 0;
-
 	MAKE_STD_ZVAL(clone);
 	ch->clone = clone;
 
@@ -1995,8 +1993,7 @@ PHP_FUNCTION(curl_copy_handle)
 	TSRMLS_SET_CTX(dupch->thread_ctx);
 
 	dupch->cp = cp;
-	dupch->uses = 0;
-	ch->uses++;
+	zend_list_addref(Z_LVAL_P(zid));
 	if (ch->handlers->write->stream) {
 		Z_ADDREF_P(ch->handlers->write->stream);
 	}
@@ -3210,11 +3207,7 @@ PHP_FUNCTION(curl_close)
 		return;
 	}
 
-	if (ch->uses) {
-		ch->uses--;
-	} else {
-		zend_list_delete(Z_LVAL_P(zid));
-	}
+	zend_list_delete(Z_LVAL_P(zid));
 }
 /* }}} */
 
@@ -3267,9 +3260,11 @@ static void _php_curl_close_ex(php_curl *ch TSRMLS_DC)
 	if (ch->handlers->write_header->func_name) {
 		zval_ptr_dtor(&ch->handlers->write_header->func_name);
 	}
+#if CURLOPT_PASSWDFUNCTION != 0
 	if (ch->handlers->passwd) {
 		zval_ptr_dtor(&ch->handlers->passwd);
 	}
+#endif
 	if (ch->handlers->std_err) {
 		zval_ptr_dtor(&ch->handlers->std_err);
 	}
