@@ -4902,6 +4902,7 @@ ZEND_METHOD(reflection_property, __construct)
 		reference->prop.h = zend_get_hash_value(name_str, name_len+1);
 		reference->prop.doc_comment = NULL;
 		reference->prop.ce = ce;
+		reference->prop.accs = NULL;
 	} else {
 		reference->prop = *property_info;
 	}

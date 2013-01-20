@@ -143,7 +143,7 @@ ZEND_API HashTable *zend_std_get_debug_info(zval *object, int *is_temp TSRMLS_DC
 }
 /* }}} */
 
-static zval *zend_std_call_getter(zval *object, zval *member, zend_function *getter, int bp_var_type TSRMLS_DC) /* {{{ */
+static zval *zend_std_call_getter(zval *object, zval *member, zend_function *getter, int bp_var_type, zend_guard *guard TSRMLS_DC) /* {{{ */
 {
 	zval *rv = NULL;
 	zend_object *zobj = Z_OBJ_P(object);
@@ -162,7 +162,9 @@ static zval *zend_std_call_getter(zval *object, zval *member, zend_function *get
 	SEPARATE_ARG_IF_REF(member);
 
 	if(getter == zobj->ce->__get) {
+		guard->in_get = 1; /* prevent circular getting */
 		zend_call_method_with_1_params(&object, zobj->ce, &zobj->ce->__get, ZEND_GET_FUNC_NAME, &rv, member);
+		guard->in_get = 0;
 	} else {
 		zend_call_method_with_0_params(&object, zobj->ce, &getter, getter->common.function_name, &rv);
 	}
@@ -199,7 +201,7 @@ static zval *zend_std_call_getter(zval *object, zval *member, zend_function *get
 }
 /* }}} */
 
-static int zend_std_call_setter(zval *object, zval *member, zval *value, zend_function *setter TSRMLS_DC) /* {{{ */
+static int zend_std_call_setter(zval *object, zval *member, zval *value, zend_function *setter, zend_guard *guard TSRMLS_DC) /* {{{ */
 {
 	zval *retval = NULL;
 	int result = FAILURE;
@@ -220,7 +222,9 @@ static int zend_std_call_setter(zval *object, zval *member, zval *value, zend_fu
 	   it should return whether the call was successful or not
 	*/
 	if(setter == zobj->ce->__set) {
+		guard->in_set = 1;	/* Prevent recursion */
 		zend_call_method_with_2_params(&object, zobj->ce, &zobj->ce->__set, ZEND_SET_FUNC_NAME, &retval, member, value);
+		guard->in_set = 0;
 	} else {
 		zend_call_method_with_1_params(&object, zobj->ce, &setter, setter->common.function_name, &retval, value);
 	}
@@ -237,7 +241,7 @@ static int zend_std_call_setter(zval *object, zval *member, zval *value, zend_fu
 }
 /* }}} */
 
-static void zend_std_call_unsetter(zval *object, zval *member, zend_function *unsetter TSRMLS_DC) /* {{{ */
+static void zend_std_call_unsetter(zval *object, zval *member, zend_function *unsetter, zend_guard *guard TSRMLS_DC) /* {{{ */
 {
 	zend_object *zobj = Z_OBJ_P(object);
 
@@ -253,7 +257,9 @@ static void zend_std_call_unsetter(zval *object, zval *member, zend_function *un
 	SEPARATE_ARG_IF_REF(member);
 
 	if(unsetter == zobj->ce->__unset) {
+		guard->in_unset = 1; /* Prevent recursion */
 		zend_call_method_with_1_params(&object, zobj->ce, &zobj->ce->__unset, ZEND_UNSET_FUNC_NAME, NULL, member);
+		guard->in_unset = 0; /* Prevent recursion */
 	} else {
 		zend_call_method_with_0_params(&object, zobj->ce, &unsetter, unsetter->common.function_name, NULL);
 	}
@@ -263,7 +269,7 @@ static void zend_std_call_unsetter(zval *object, zval *member, zend_function *un
 }
 /* }}} */
 
-static int zend_std_call_issetter(zval *object, zval *member, int has_set_exists, zend_function *issetter, const zend_literal *key TSRMLS_DC) /* {{{ */
+static int zend_std_call_issetter(zval *object, zval *member, int has_set_exists, zend_function *issetter, const zend_literal *key, zend_guard *guard TSRMLS_DC) /* {{{ */
 {
 	zend_object *zobj = Z_OBJ_P(object);
 	zval *rv;
@@ -283,7 +289,9 @@ static int zend_std_call_issetter(zval *object, zval *member, int has_set_exists
 	SEPARATE_ARG_IF_REF(member);
 
 	if(issetter == zobj->ce->__isset) {
+		guard->in_isset = 1; /* Prevent recursion */
 		zend_call_method_with_1_params(&object, zobj->ce, &zobj->ce->__isset, ZEND_ISSET_FUNC_NAME, &rv, member);
+		guard->in_isset = 0;
 	} else {
 		zend_call_method_with_0_params(&object, zobj->ce, &issetter, issetter->common.function_name, &rv);
 	}
@@ -617,7 +625,7 @@ zval *zend_std_read_property(zval *object, zval *member, int type, const zend_li
 			if(!(getter->common.fn_flags & ZEND_ACC_CALL_GUARD)) {
 
 				getter->common.fn_flags |= ZEND_ACC_CALL_GUARD;
-				rv = zend_std_call_getter(object, member, getter, type TSRMLS_CC);
+				rv = zend_std_call_getter(object, member, getter, type, NULL TSRMLS_CC);
 				getter->common.fn_flags &= ~ZEND_ACC_CALL_GUARD;
 
 				retval = &rv;
@@ -638,11 +646,8 @@ zval *zend_std_read_property(zval *object, zval *member, int type, const zend_li
 			zend_guard *guard = NULL;
 
 			if ( zobj->ce->__get != NULL && zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && !guard->in_get) {
-				/* have getter - try with it! */
-
-				guard->in_get = 1; /* prevent circular getting */
-				rv = zend_std_call_getter(object, member, zobj->ce->__get, type TSRMLS_CC);
-				guard->in_get = 0;
+				/* have magic __get - try with it! */
+				rv = zend_std_call_getter(object, member, zobj->ce->__get, type, guard TSRMLS_CC);
 				retval = &rv;
 			} else {
 				if (zobj->ce->__get && guard && guard->in_get == 1) {
@@ -701,7 +706,7 @@ ZEND_API void zend_std_write_property(zval *object, zval *member, zval *value, c
 			if(!(setter->common.fn_flags & ZEND_ACC_CALL_GUARD)) {
 
 				setter->common.fn_flags |= ZEND_ACC_CALL_GUARD;
-				zend_std_call_setter(object, member, value, setter TSRMLS_CC);
+				zend_std_call_setter(object, member, value, setter, NULL TSRMLS_CC);
 				setter->common.fn_flags &= ~ZEND_ACC_CALL_GUARD;
 
 				handled = 1;
@@ -749,9 +754,7 @@ ZEND_API void zend_std_write_property(zval *object, zval *member, zval *value, c
 			zend_guard 		*guard = NULL;
 
 			if (zobj->ce->__set  && zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && !guard->in_set) {
-				guard->in_set = 1; /* prevent circular setting */
-				zend_std_call_setter(object, member, value, zobj->ce->__set TSRMLS_CC);
-				guard->in_set = 0;
+				zend_std_call_setter(object, member, value, zobj->ce->__set, guard TSRMLS_CC);
 			} else if (EXPECTED(property_info != NULL)) {
 				/* if we assign referenced variable, we should separate it */
 				Z_ADDREF_P(value);
@@ -981,7 +984,7 @@ static void zend_std_unset_property(zval *object, zval *member, const zend_liter
 			if(!(unsetter->common.fn_flags & ZEND_ACC_CALL_GUARD)) {
 
 				unsetter->common.fn_flags |= ZEND_ACC_CALL_GUARD;
-				zend_std_call_unsetter(object, member, unsetter TSRMLS_CC);
+				zend_std_call_unsetter(object, member, unsetter, NULL TSRMLS_CC);
 				unsetter->common.fn_flags &= ~ZEND_ACC_CALL_GUARD;
 
 				handled = 1;
@@ -1010,10 +1013,8 @@ static void zend_std_unset_property(zval *object, zval *member, const zend_liter
 			zend_guard *guard = NULL;
 
 			if (zobj->ce->__unset && zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && !guard->in_unset) {
-				/* have unsetter - try with it! */
-				guard->in_unset = 1; /* prevent circular unsetting */
-				zend_std_call_unsetter(object, member, zobj->ce->__unset TSRMLS_CC);
-				guard->in_unset = 0;
+				/* have magic __unset - try with it! */
+				zend_std_call_unsetter(object, member, zobj->ce->__unset, guard TSRMLS_CC);
 			} else if (zobj->ce->__unset && guard && guard->in_unset == 1) {
 				if (Z_STRVAL_P(member)[0] == '\0') {
 					if (Z_STRLEN_P(member) == 0) {
@@ -1609,7 +1610,7 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 			if(!(issetter->common.fn_flags & ZEND_ACC_CALL_GUARD)) {
 
 				issetter->common.fn_flags |= ZEND_ACC_CALL_GUARD;
-				result = zend_std_call_issetter(object, member, has_set_exists, issetter, key TSRMLS_CC);
+				result = zend_std_call_issetter(object, member, has_set_exists, issetter, key, NULL TSRMLS_CC);
 				issetter->common.fn_flags &= ~ZEND_ACC_CALL_GUARD;
 
 			} else if(EG(active_op_array) != (zend_op_array*)issetter) {
@@ -1628,10 +1629,8 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 
 			result = 0;
 			if ((has_set_exists != 2) && zobj->ce->__isset && zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && !guard->in_isset) {
-				/* have issetter - try with it! */
-				guard->in_isset = 1; /* prevent circular getting */
-				result = zend_std_call_issetter(object, member, has_set_exists, zobj->ce->__isset, key TSRMLS_CC);
-				guard->in_isset = 0;
+				/* have magic __isset - try with it! */
+				result = zend_std_call_issetter(object, member, has_set_exists, zobj->ce->__isset, key, guard TSRMLS_CC);
 			}
 		} else {
 			*value = zend_std_read_property(object, member, BP_VAR_IS, key TSRMLS_CC);
