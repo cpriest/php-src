@@ -43,17 +43,6 @@
 		zn.EA = 0;												\
 	}
 
-#define MAKE_ZNODE(zn, str)	 \
-	{															\
-		INIT_ZNODE(zn);										\
-		ZVAL_STRINGL(&zn.u.constant, str, strlen(str), 1);		\
-	}
-#define MAKE_ZNODEL(zn, str, l)	 \
-	{													\
-		INIT_ZNODE(zn);								\
-		ZVAL_STRINGL(&zn.u.constant, str, l, 1);		\
-	}
-
 #define SET_UNUSED(op)  op ## _type = IS_UNUSED
 
 #define INC_BPC(op_array)	if (op_array->fn_flags & ZEND_ACC_INTERACTIVE) { (CG(context).backpatch_count++); }
